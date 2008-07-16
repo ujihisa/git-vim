@@ -79,7 +79,7 @@ function! GitStatus()
     let git_output = system('git status')
     call <SID>OpenGitBuffer(git_output)
     setlocal filetype=git-status
-    nnoremap <buffer> <CR> :GitAdd <cfile><CR>
+    nnoremap <buffer> <CR> :GitAdd <cfile><CR>:call GitStatus()<CR>
 endfunction
 
 " Show Log.
@@ -202,6 +202,7 @@ function! s:OpenGitBuffer(content)
     setlocal nomodifiable
 
     let b:is_git_msg_buffer = 1
+    nnoremap <buffer> <silent> q :close<CR>
 endfunction
 
 function! s:Expand(expr)
