@@ -104,6 +104,7 @@ function! GitCommit(args)
     call system('git commit ' . a:args)
     let $EDITOR = editor_save
 
+    call GitBranch()
     execute printf('%s %sCOMMIT_EDITMSG', g:git_command_edit, b:git_dir)
     setlocal filetype=git-status bufhidden=wipe
     augroup GitCommit
