@@ -14,18 +14,24 @@ nnoremap <Leader>ga :GitAdd<Enter>
 nnoremap <Leader>gA :GitAdd <cfile><Enter>
 nnoremap <Leader>gc :GitCommit<Enter>
 
-" Returns current git branch.
-" Call inside 'statusline' or 'titlestring'.
-function! GitBranch()
+" Ensure b:git_dir exists.
+function! s:GetGitDir()
     if !exists('b:git_dir')
         let b:git_dir = finddir('.git', expand('%:p:h') . ';/')
         if strlen(b:git_dir)
             let b:git_dir = fnamemodify(b:git_dir, ':p')
         endif
     endif
+    return b:git_dir
+endfunction
 
-    if strlen(b:git_dir) && filereadable(b:git_dir . 'HEAD')
-        let lines = readfile(b:git_dir . 'HEAD')
+" Returns current git branch.
+" Call inside 'statusline' or 'titlestring'.
+function! GitBranch()
+    let git_dir = <SID>GetGitDir()
+
+    if strlen(git_dir) && filereadable(git_dir . 'HEAD')
+        let lines = readfile(git_dir . 'HEAD')
         return len(lines) ? matchstr(lines[0], '[^/]*$') : ''
     else
         return ''
@@ -71,7 +77,7 @@ function! GitDiff(args)
     endif
 
     call <SID>OpenGitBuffer(git_output)
-    setlocal filetype=diff
+    setlocal filetype=git-diff
 endfunction
 
 " Show Status.
@@ -79,12 +85,19 @@ function! GitStatus()
     let git_output = system('git status')
     call <SID>OpenGitBuffer(git_output)
     setlocal filetype=git-status
-    nnoremap <buffer> <CR> :GitAdd <cfile><CR>:call GitStatus()<CR>
+    nnoremap <buffer> <Enter> :GitAdd <cfile><Enter>:call <SID>RefreshGitStatus()<Enter>
+    nnoremap <buffer> -       :silent !git reset HEAD -- =expand('<cfile>')<Enter><Enter>:call <SID>RefreshGitStatus()<Enter>
+endfunction
+
+function! s:RefreshGitStatus()
+    let pos_save = getpos('.')
+    GitStatus
+    call setpos('.', pos_save)
 endfunction
 
 " Show Log.
-function! GitLog()
-    let git_output = system('git log -- ' . s:Expand('%'))
+function! GitLog(args)
+    let git_output = system('git log ' . a:args . ' -- ' . s:Expand('%'))
     call <SID>OpenGitBuffer(git_output)
     setlocal filetype=git-log
 endfunction
@@ -98,14 +111,15 @@ endfunction
 
 " Commit.
 function! GitCommit(args)
+    let git_dir = <SID>GetGitDir()
+
     " Create COMMIT_EDITMSG file
     let editor_save = $EDITOR
     let $EDITOR = ''
     call system('git commit ' . a:args)
     let $EDITOR = editor_save
 
-    call GitBranch()
-    execute printf('%s %sCOMMIT_EDITMSG', g:git_command_edit, b:git_dir)
+    execute printf('%s %sCOMMIT_EDITMSG', g:git_command_edit, git_dir)
     setlocal filetype=git-status bufhidden=wipe
     augroup GitCommit
         autocmd BufWritePre  <buffer> g/^#\|^\s*$/d | setlocal fileencoding=utf-8
@@ -217,7 +231,7 @@ command! -nargs=1 -complete=customlist,ListGitCommits GitCheckout call GitChecko
 command! -nargs=* -complete=customlist,ListGitCommits GitDiff     call GitDiff(<q-args>)
 command!          GitStatus           call GitStatus()
 command! -nargs=? GitAdd              call GitAdd(<q-args>)
-command!          GitLog              call GitLog()
+command! -nargs=* GitLog              call GitLog(<q-args>)
 command! -nargs=* GitCommit           call GitCommit(<q-args>)
 command! -nargs=1 GitCatFile          call GitCatFile(<q-args>)
 command! -nargs=+ Git                 call GitDoCommand(<q-args>)
